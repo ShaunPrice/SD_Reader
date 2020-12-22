@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="SD_READER.ino" />
+    <None Include="data\xlight00.dat" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="__vm\.SD_READER.vsarduino.h">

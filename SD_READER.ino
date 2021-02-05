@@ -32,7 +32,7 @@
 #include <FSEQLib.h>
 #include <SPI.h>
 
-//#define DEBUG
+#define DEBUG
 
 
 #ifdef DEBUG
@@ -47,6 +47,10 @@
 #define CardDetectedFalse 0
 
 #ifdef ESP32
+#include <sd_diskio.h>
+#include <sd_defines.h>
+#include <SD.h>
+
 SPIClass spiFPGA(HSPI);
 #define FPGA_HANDSHAKE 2
 #define FPGA_MISO 12
@@ -60,8 +64,6 @@ const uint8_t chipSelect = BUILTIN_SDCARD; // Teensy 3.5 & 3.6 & 4.1 on-board
 #define FPGA_CS   10
 #endif
 
-
-
 const size_t UNIVERSES = 16 ;
 const size_t PIXELS = 150;
 const size_t LEDS_PER_UNIVERSE = PIXELS * 3;
@@ -71,11 +73,11 @@ SdFs sd;
 FsFile dataFile;
 HeaderData rawHeader;
 FSEQLib header;
-const  char* filename = "data.fseq";
+const  char* filename = "show.dat";
 
 // SPI
 char stepBuffer[STEP_BUFFER_LENGTH];
-uint8_t universeBuffer[LEDS_PER_UNIVERSE + 1];
+uint8_t universeBuffer[LEDS_PER_UNIVERSE + 5];
 char * receiveFPGABuffer;
 
 uint32_t currentStep = 0;
@@ -109,7 +111,7 @@ void setup()
 
 void loop()
 {
-	unsigned long startMillis = millis();	
+	unsigned long startMicros = micros();	
 	
 	DEBUG_PRINTLN("Checking Initialization state of SD card...");
 #ifdef ESP32
@@ -217,10 +219,18 @@ void loop()
 		for (uint8_t current_universe = 0; current_universe < UNIVERSES; current_universe++)
 		{
 			// Copy the led values into the universe buffer
-			memcpy(&universeBuffer[1],&stepBuffer[current_universe * LEDS_PER_UNIVERSE], LEDS_PER_UNIVERSE);
+			memcpy(&universeBuffer[5],&stepBuffer[current_universe * LEDS_PER_UNIVERSE], LEDS_PER_UNIVERSE);
 
-			// Set the one byte header to the universe number (starting with 0)
+			// Set the header to the universe number (starting with 0)
 			universeBuffer[0] = current_universe;
+
+			// Set the header pixel count (256 max)
+			universeBuffer[1] = PIXELS;
+
+			// Set the header colour ordering
+			universeBuffer[2] = 1; // Red
+			universeBuffer[3] = 2; // Green
+			universeBuffer[4] = 0; // Blue
 
 			SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
 
@@ -231,7 +241,7 @@ void loop()
 #ifdef ESP32
 			spiFPGA.writeBytes(&universeBuffer[0], LEDS_PER_UNIVERSE + 1);
 #else
-			SPI.transfer(&universeBuffer[0], LEDS_PER_UNIVERSE + 1);
+			SPI.transfer(&universeBuffer[0], LEDS_PER_UNIVERSE + 5);
 #endif		
 			// Raise the CS line
 			digitalWrite(FPGA_CS, HIGH);
@@ -254,5 +264,5 @@ void loop()
 	}
 	// Delay to make sure we send x20 per second.
 	// The delay is constrained between 1ms and 50ms
-	delay(constrain(50 - (millis() - (uint32_t)startMillis),1,50));
+	delayMicroseconds(constrain(50000 - (micros() - (uint32_t)startMicros),1,50000));
 }
